@@ -266,7 +266,7 @@
         let tai = num1 + num2;
         if (tai > 100) tai = 100;
         const xiu = 100 - tai;
-        const result = tai >= xiu ? "XỈU" : "TÀI";
+        const result = tai >= xiu ? "TÀI" : "XỈU";
 
         document.getElementById("result").innerHTML = `<p><strong>Kết quả:</strong> ${result}</p>`;
         document.getElementById("led-tai").classList.remove("active");
