@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sun Win - Dự Đoán Tài Xỉu</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+  <style>
+    body {
+      background-color: black;
+      color: #00ff00;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      overflow: hidden;
+    }
+    .card {
+      max-width: 400px;
+      margin: 80px auto;
+      padding: 30px;
+      background: rgba(0,0,0,0.95);
+      border: 2px solid #00ff00;
+      border-radius: 15px;
+      box-shadow: 0 0 15px #00ff00;
+      text-align: center;
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px;
+      margin: 15px 0;
+      background: black;
+      color: #00ff00;
+      border: 1px solid #00ff00;
+      border-radius: 8px;
+    }
+    .btn-analyze {
+      padding: 10px 20px;
+      background: black;
+      color: #00ff00;
+      border: 2px solid #00ff00;
+      border-radius: 10px;
+      cursor: pointer;
+    }
+    .led {
+      width: 20px;
+      height: 20px;
+      background: #333;
+      border-radius: 50%;
+      display: inline-block;
+      margin: 10px 5px;
+    }
+    .led.active {
+      background: #00ff00;
+      box-shadow: 0 0 6px #00ff00;
+    }
+    .circle-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: 3px solid #00ff00;
+      background: black;
+      color: #00ff00;
+      font-weight: bold;
+      font-size: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      margin: 10px;
+    }
+    .button-container {
+      display: flex;
+      justify-content: center;
+    }
+    #usage-info, #logout-btn {
+      position: fixed;
+      top: 10px;
+      z-index: 999;
+      font-weight: bold;
+    }
+    #usage-info {
+      left: 10px;
+    }
+    #logout-btn {
+      right: 10px;
+    }
+    #logout-btn button {
+      background: black;
+      color: #00ff00;
+      border: 1px solid #00ff00;
+      padding: 5px 15px;
+      border-radius: 5px;
+    }
+
+    .game-select-container {
+      position: fixed;
+      top: 40px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 998;
+    }
+    .game-select {
+      background: black;
+      color: #00ff00;
+      border: 1px solid #00ff00;
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 16px;
+      width: 150px;
+    }
+
+    #gameSelectContainer, #usage-info {
+      display: none;
+    }
+    #main-section {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Đăng nhập -->
+  <div class="card" id="login-section">
+    <h2>@KanHaoDATA</h2>
+    <input type="text" id="access_key" class="form-control" placeholder="Nhập mã kích hoạt">
+    <button class="btn-analyze" onclick="checkKey()">Xác Nhận</button>
+  </div>
+
+  <!-- Dropdown chọn game -->
+  <div id="gameSelectContainer" class="game-select-container">
+    <select id="gameSelect" class="game-select" onchange="changeGame(this.value)">
+      <option value="sunwin">Sun Win</option>
+      <option value="md5">MD5 Dice</option>
+    </select>
+  </div>
+
+  <!-- Phần chính -->
+  <div class="card" id="main-section">
+    <h2>@KanHaoDATA – Dự Đoán Sun Win</h2>
+    <div><span class="led" id="led-tai"></span><span class="led" id="led-xiu"></span></div>  
+    <div class="button-container">
+      <div class="circle-btn" onclick="highlight('Tài')">Tài</div>
+      <div class="circle-btn" onclick="highlight('Xỉu')">Xỉu</div>
+    </div>
+    <input type="text" id="session_id" class="form-control" placeholder="Nhập mã phiên game">
+    <button class="btn-analyze" onclick="predict()">DỰ ĐOÁN</button>
+    <h3 id="result"></h3>
+  </div>
+
+  <!-- Liên hệ Admin -->
+  <div style="position: fixed; bottom: 10px; left: 10px; z-index: 999;">
+    <a href="https://t.me/KanHaoDATA" target="_blank"
+       style="display: inline-block; padding: 8px 16px; background: black; color: #00ff00;
+              border: 2px solid #00ff00; border-radius: 10px; font-weight: bold; text-decoration: none;">
+      Liên hệ Admin
+    </a>
+  </div>
+
+  <!-- Lượt đoán và đăng xuất -->
+  <div id="usage-info">Lượt đoán: 0</div>
+  <div id="logout-btn" style="display:none;">
+    <button onclick="logout()">Đăng Xuất</button>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyBMGLXd9HKgKWp4k34TEAKbYGvxfbD9cUo",
+      authDomain: "kanhaodata.firebaseapp.com",
+      databaseURL: "https://kanhaodata-default-rtdb.firebaseio.com",
+      projectId: "kanhaodata",
+      storageBucket: "kanhaodata.appspot.com",
+      messagingSenderId: "820084045633",
+      appId: "1:820084045633:web:8a1e6072a3125b146253c0",
+      measurementId: "G-T3SFTQF3DC"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    let currentKey = null;
+    let currentUsesLeft = 0;
+
+    function checkKey() {
+      const key = document.getElementById("access_key").value.trim();
+      if (!key) return alert("Vui lòng nhập key!");
+
+      db.ref("accessKeys/" + key).once("value").then(snap => {
+        if (!snap.exists()) return alert("KEY không hợp lệ.");
+
+        const data = snap.val();
+        const now = new Date();
+        const expires = new Date(data.expiresAt);
+
+        if (now > expires) return alert("KEY đã hết hạn.");
+        if (!data.usesLeft || data.usesLeft <= 0) return alert("KEY đã hết lượt.");
+
+        currentKey = key;
+        currentUsesLeft = data.usesLeft;
+
+        document.getElementById("login-section").style.display = "none";
+        document.getElementById("gameSelectContainer").style.display = "block";
+        document.getElementById("usage-info").style.display = "block";
+        document.getElementById("logout-btn").style.display = "block";
+        document.getElementById("usage-info").innerText = "Lượt đoán: " + currentUsesLeft;
+
+        localStorage.setItem("savedKey", key);
+      });
+    }
+
+    function changeGame(game) {
+      if (game === "sunwin") {
+        document.getElementById("main-section").innerHTML = `
+          <h2>@KanHaoDATA – Dự Đoán Sun Win</h2>
+          <div><span class="led" id="led-tai"></span><span class="led" id="led-xiu"></span></div>  
+          <div class="button-container">
+            <div class="circle-btn" onclick="highlight('Tài')">Tài</div>
+            <div class="circle-btn" onclick="highlight('Xỉu')">Xỉu</div>
+          </div>
+          <input type="text" id="session_id" class="form-control" placeholder="Nhập mã phiên game">
+          <button class="btn-analyze" onclick="predict()">DỰ ĐOÁN</button>
+          <h3 id="result"></h3>
+        `;
+      } else if (game === "md5") {
+        document.getElementById("main-section").innerHTML = `
+          <h2>@KanHaoDATA – Dự Đoán MD5 Dice</h2>
+          <input type="text" id="session_id" class="form-control" placeholder="Nhập mã phiên game">
+          <button class="btn-analyze" onclick="predict()">DỰ ĐOÁN</button>
+          <h3 id="result"></h3>
+        `;
+      }
+      document.getElementById("main-section").style.display = "block";
+    }
+
+    function logout() {
+      localStorage.removeItem("savedKey");
+      location.reload();
+    }
+
+    function xorHex(hex1, hex2) {
+      let result = "";
+      for (let i = 0; i < hex1.length; i++) {
+        result += (parseInt(hex1[i], 16) ^ parseInt(hex2[i], 16)).toString(16);
+      }
+      return result;
+    }
+
+    function predict() {
+      if (currentUsesLeft <= 0) {
+        alert("Đã hết lượt sử dụng.");
+        return;
+      }
+
+      const game = document.getElementById("gameSelect").value;
+      const session = document.getElementById("session_id").value.trim();
+      if (!session) return alert("Vui lòng nhập mã phiên game!");
+
+      if (game === "sunwin") {
+        const md5Hash = CryptoJS.MD5(session).toString();
+        const sha256Hash = CryptoJS.SHA256(session).toString();
+        const xor1 = xorHex(md5Hash.slice(0,16), sha256Hash.slice(0,16));
+        const xor2 = xorHex(md5Hash.slice(16), sha256Hash.slice(16));
+        const num1 = parseInt(xor1, 16) % 51;
+        const num2 = parseInt(xor2, 16) % 50;
+        let tai = num1 + num2;
+        if (tai > 100) tai = 100;
+        const xiu = 100 - tai;
+        const result = tai >= xiu ? "XỈU" : "TÀI";
+
+        document.getElementById("result").innerHTML = `<p><strong>Kết quả:</strong> ${result}</p>`;
+        document.getElementById("led-tai").classList.remove("active");
+        document.getElementById("led-xiu").classList.remove("active");
+        blinkLED(result === "XỈU" ? "led-xiu" : "led-tai");
+      } else if (game === "md5") {
+        const last6 = session.slice(-6);
+        const decimal = parseInt(last6, 16);
+        const d1 = (decimal % 6) + 1;
+        const d2 = (Math.floor(decimal / 6) % 6) + 1;
+        const d3 = (Math.floor(decimal / 36) % 6) + 1;
+        const total = d1 + d2 + d3;
+        const icons = ["⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
+        const faces = `${icons[d1 - 1]} ${icons[d2 - 1]} ${icons[d3 - 1]}`;
+        const tx = total >= 11 ? "TÀI" : "XỈU";
+        document.getElementById("result").innerHTML = `${faces} → ${tx}`;
+      }
+
+      currentUsesLeft--;
+      db.ref("accessKeys/" + currentKey + "/usesLeft").set(currentUsesLeft);
+      document.getElementById("usage-info").innerText = "Lượt còn lại: " + currentUsesLeft;
+    }
+
+    function blinkLED(id) {
+      let count = 0;
+      const led = document.getElementById(id);
+      const interval = setInterval(() => {
+        led.classList.toggle("active");
+        count++;
+        if (count >= 12) clearInterval(interval);
+      }, 100);
+    }
+
+    function highlight(type) {
+      document.getElementById("led-tai").classList.remove("active");
+      document.getElementById("led-xiu").classList.remove("active");
+      document.getElementById(type === "Xỉu" ? "led-xiu" : "led-tai").classList.add("active");
+    }
+
+    window.onload = () => {
+      const savedKey = localStorage.getItem("savedKey");
+      if (savedKey) {
+        document.getElementById("access_key").value = savedKey;
+        checkKey();
+      }
+    };
+  </script>
+</body>
+</html>
