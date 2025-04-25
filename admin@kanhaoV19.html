@@ -177,6 +177,8 @@
           <strong>Lượt còn lại:</strong> <span id="uses_${key}">${data.usesLeft}</span><br>
           <input type="number" class="inline" id="add_${key}" placeholder="Cộng lượt">
           <button class="btn-small" onclick="addUses('${key}')">Cộng</button>
+          <input type="number" class="inline" id="sub_${key}" placeholder="Trừ lượt">
+          <button class="btn-small" onclick="subtractUses('${key}')">Trừ</button>
           <button class="btn-small" onclick="removeKey('${key}')">Xoá</button>
         `;
         keyList.appendChild(li);
@@ -196,6 +198,24 @@
     database.ref("accessKeys/" + key + "/usesLeft").set(newUses).then(() => {
       usesText.innerText = newUses;
       alert("Đã cập nhật lượt sử dụng.");
+      input.value = "";
+    });
+  }
+
+  function subtractUses(key) {
+    const input = document.getElementById(`sub_${key}`);
+    const subValue = parseInt(input.value);
+    if (isNaN(subValue) || subValue <= 0) return alert("Vui lòng nhập số lượt hợp lệ");
+
+    const usesText = document.getElementById(`uses_${key}`);
+    const currentUses = parseInt(usesText.innerText);
+    const newUses = currentUses - subValue;
+
+    if (newUses < 0) return alert("Lượt sử dụng không thể âm!");
+
+    database.ref("accessKeys/" + key + "/usesLeft").set(newUses).then(() => {
+      usesText.innerText = newUses;
+      alert("Đã trừ lượt sử dụng.");
       input.value = "";
     });
   }
